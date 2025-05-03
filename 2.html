@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Guitar Tuner</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #111;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem;
+    }
+    .note {
+      font-size: 5rem;
+      margin: 1rem 0;
+    }
+    .frequency {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .indicator {
+      width: 100%;
+      max-width: 400px;
+      height: 10px;
+      background: #333;
+      position: relative;
+      margin: 1rem 0;
+    }
+    .needle {
+      position: absolute;
+      top: -5px;
+      width: 2px;
+      height: 20px;
+      background: #1db954;
+      left: 50%;
+      transform: translateX(-50%);
+      transition: left 0.1s ease;
+    }
+    .controls {
+      margin-top: 2rem;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      margin: 0 0.5rem;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="note" id="note">--</div>
+  <div class="frequency" id="frequency">0.00 Hz</div>
+  <div class="indicator">
+    <div class="needle" id="needle"></div>
+  </div>
+  <div class="controls">
+    <button id="start">Start</button>
+    <button id="stop" disabled>Stop</button>
+  </div>
+
+  <script>
+    const noteEl = document.getElementById('note');
+    const freqEl = document.getElementById('frequency');
+    const needleEl = document.getElementById('needle');
+    const startBtn = document.getElementById('start');
+    const stopBtn = document.getElementById('stop');
+
+    let audioContext;
+    let analyser;
+    let microphone;
+    let bufferLength;
+    let dataArray;
+    let rafId;
+    let isRunning = false;
+
+    const A4 = 440;
+    const noteStrings = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
+    function noteFromFrequency(freq) {
+      const noteNum = 12 * (Math.log(freq / A4) / Math.log(2));
+      return Math.round(noteNum) + 69;
+    }
+
+    function frequencyFromNoteNumber(note) {
+      return A4 * Math.pow(2, (note - 69) / 12);
+    }
+
+    function centsOffFromPitch(freq, note) {
+      return Math.floor(1200 * Math.log(freq / frequencyFromNoteNumber(note)) / Math.log(2));
+    }
+
+    function autoCorrelate(buffer, sampleRate) {
+      const SIZE = buffer.length;
+      const MAX_SAMPLES = Math.floor(SIZE / 2);
+      let bestOffset = -1;
+      let bestCorrelation = 0;
+      let rms = 0;
+
+      for (let i = 0; i < SIZE; i++) {
+        const val = buffer[i];
+        rms += val * val;
+      }
+      rms = Math.sqrt(rms / SIZE);
+      if (rms < 0.01) return -1;
+
+      let lastCorrelation = 1;
+      for (let offset = 0; offset < MAX_SAMPLES; offset++) {
+        let correlation = 0;
+        for (let i = 0; i < MAX_SAMPLES; i++) {
+          correlation += Math.abs(buffer[i] - buffer[i + offset]);
+        }
+        correlation = 1 - (correlation / MAX_SAMPLES);
+        if (correlation > bestCorrelation) {
+          bestCorrelation = correlation;
+          bestOffset = offset;
+        } else if (correlation < lastCorrelation) {
+          break;
+        }
+        lastCorrelation = correlation;
+      }
+      if (bestCorrelation > 0.9) {
+        return sampleRate / bestOffset;
+      }
+      return -1;
+    }
+
+    function updatePitch() {
+      analyser.getFloatTimeDomainData(dataArray);
+      const freq = autoCorrelate(dataArray, audioContext.sampleRate);
+      if (freq !== -1) {
+        const note = noteFromFrequency(freq);
+        const noteName = noteStrings[note % 12];
+        const octave = Math.floor(note / 12) - 1;
+        const cents = centsOffFromPitch(freq, note);
+
+        noteEl.textContent = noteName + octave;
+        freqEl.textContent = freq.toFixed(2) + ' Hz';
+        const percent = 50 + cents;
+        needleEl.style.left = `${Math.max(0, Math.min(100, percent))}%`;
+      } else {
+        noteEl.textContent = '--';
+        freqEl.textContent = '0.00 Hz';
+        needleEl.style.left = '50%';
+      }
+      if (isRunning) {
+        rafId = requestAnimationFrame(updatePitch);
+      }
+    }
+
+    async function startTuner() {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        microphone = audioContext.createMediaStreamSource(stream);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+        bufferLength = analyser.fftSize;
+        dataArray = new Float32Array(bufferLength);
+        microphone.connect(analyser);
+        isRunning = true;
+        updatePitch();
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+      } catch (err) {
+        alert('Microphone access denied.');
+      }
+    }
+
+    function stopTuner() {
+      isRunning = false;
+      cancelAnimationFrame(rafId);
+      if (microphone) microphone.disconnect();
+      if (analyser) analyser.disconnect();
+      if (audioContext) audioContext.close();
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+    }
+
+    startBtn.addEventListener('click', startTuner);
+    stopBtn.addEventListener('click', stopTuner);
+  </script>
+</body>
+</html>
