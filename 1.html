@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guitar Tuner | Tune with Precision</title>
+    <style>
+        :root {
+            --bg-primary: #121212;
+            --bg-secondary: #1e1e1e;
+            --accent-color: #1db954;
+            --text-primary: #ffffff;
+            --text-secondary: #b3b3b3;
+            --error-color: #ff5252;
+            --inactive-color: #535353;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: background-color 0.3s ease;
+        }
+
+        main {
+            width: 100%;
+            max-width: 800px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem;
+        }
+
+        .tuner-container {
+            width: 100%;
+            max-width: 600px;
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .note-display {
+            font-size: 6rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 1rem;
+            min-height: 120px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .tuning-indicator {
+            height: 6px;
+            width: 100%;
+            background-color: var(--inactive-color);
+            border-radius: 3px;
+            position: relative;
+            margin-bottom: 2rem;
+        }
+
+        .indicator-needle {
+            position: absolute;
+            width: 4px;
+            height: 20px;
+            background-color: var(--text-primary);
+            top: -7px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 2px;
+            transition: left 0.2s ease;
+        }
+
+        .frequency-display {
+            text-align: center;
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        .strings-container {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .string-btn {
+            flex: 1;
+            min-width: 70px;
+            padding: 1rem 0.5rem;
+            background-color: var(--bg-primary);
+            color: var(--text-secondary);
+            border: none;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .string-btn:hover {
+            background-color: #2a2a2a;
+        }
+
+        .string-btn.active {
+            background-color: var(--accent-color);
+            color: var(--bg-primary);
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-color);
+            color: var(--bg-primary);
+        }
+
+        .btn-primary:hover {
+            background-color: #1ed760;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            color: var(--text-primary);
+            border: 1px solid var(--text-secondary);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--text-primary);
+        }
+
+        .permission-required {
+            text-align: center;
+            color: var(--error-color);
+            padding: 1rem;
+            border: 1px solid var(--error-color);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+    </style>
+</head>
+<body>
+    <main>
+        <div class="permission-required" id="permission-alert">
+            Microphone access is required for the tuner to work. Please allow access when prompted.
+        </div>
+
+        <div class="tuner-container">
+            <div class="note-display" id="note-display">—</div>
+            
+            <div class="tuning-indicator">
+                <div class="indicator-needle" id="indicator-needle"></div>
+            </div>
+            
+            <div class="frequency-display" id="frequency-display">0 Hz</div>
+            
+            <div class="strings-container">
+                <button class="string-btn active" data-note="E" data-freq="82.41">E2</button>
+                <button class="string-btn" data-note="A" data-freq="110.00">A2</button>
+                <button class="string-btn" data-note="D" data-freq="146.83">D3</button>
+                <button class="string-btn" data-note="G" data-freq="196.00">G3</button>
+                <button class="string-btn" data-note="B" data-freq="246.94">B3</button>
+                <button class="string-btn" data-note="E" data-freq="329.63">E4</button>
+            </div>
+            
+            <div class="controls">
+                <button class="btn btn-primary" id="start-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                        <line x1="12" y1="19" x2="12" y2="22"></line>
+                    </svg>
+                    Start Tuning
+                </button>
+                <button class="btn btn-secondary" id="stop-btn" disabled>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+                    </svg>
+                    Stop
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const noteDisplay = document.getElementById('note-display');
+            const frequencyDisplay = document.getElementById('frequency-display');
+            const indicatorNeedle = document.getElementById('indicator-needle');
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const permissionAlert = document.getElementById('permission-alert');
+            const stringBtns = document.querySelectorAll('.string-btn');
+            
+            let audioContext;
+            let analyser;
+            let microphone;
+            let animationFrame;
+            let isListening = false;
+            let targetFrequency = 82.41;
+            let currentString = 'E2';
+            
+            const A4 = 440;
+            const SEMITONE = Math.pow(2, 1/12);
+            
+            const noteStrings = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+            
+            const guitarStrings = {
+                'E2': 82.41,
+                'A2': 110.00,
+                'D3': 146.83,
+                'G3': 196.00,
+                'B3': 246.94,
+                'E4': 329.63
+            };
+            
+            function getNoteFromPitch(frequency) {
+                const noteNum = 12 * (Math.log(frequency / A4) / Math.log(2));
+                const note = Math.round(noteNum) + 69;
+                return note;
+            }
+            
+            function getFrequencyFromNoteNumber(note) {
+                return A4 * Math.pow(SEMITONE, note - 69);
+            }
+            
+            function getCentsOffFromPitch(frequency, note) {
+                const frequencyFromNoteNum = getFrequencyFromNoteNumber(note);
+                const ratio = frequency / frequencyFromNoteNum;
+                return Math.floor(1200 * Math.log(ratio) / Math.log(2));
+            }
+            
+            function getNoteDetails(frequency) {
+                const noteNum = getNoteFromPitch(frequency);
+                const noteName = noteStrings[noteNum % 12];
+                const octave = Math.floor(noteNum / 12) - 1;
+                const cents = getCentsOffFromPitch(frequency, noteNum);
+                
+                return {
+                    note: noteName,
+                    octave: octave,
+                    frequency: frequency,
+                    cents: cents
+                };
+            }
+            
+            function updateIndicator(cents) {
+                const limitedCents = Math.max(-50, Math.min(50, cents));
+                const position = 50 + limitedCents;
+                indicatorNeedle.style.left = `${position}%`;
+                
+                if (Math.abs(cents) < 5) {
+                    noteDisplay.style.color = 'var(--accent-color)';
+                } else if (Math.abs(cents) < 15) {
+                    noteDisplay.style.color = '#FFC107';
+                } else {
+                    noteDisplay.style.color = 'var(--error-color)';
+                }
+            }
+            
+            function autoCorrelate(buf, sampleRate) {
+                const SIZE = buf.length;
+                const MAX_SAMPLES = Math.floor(SIZE/2);
+                const correlations = new Array(MAX_SAMPLES);
+                
+                let bestOffset = -1;
+                let bestCorrelation = 0;
+                let rms = 0;
+                
+                for (let i = 0; i < SIZE; i++) {
+                    const val = buf[i];
+                    rms += val * val;
+                }
+                
+                rms = Math.sqrt(rms / SIZE);
+                
+                if (rms < 0.01) {
+                    return -1;
+                }
+                
+                let lastCorrelation = 1;
+                
+                for (let offset = 0; offset < MAX_SAMPLES; offset++) {
+                    let correlation = 0;
+                    
+                    for (let i = 0; i < MAX_SAMPLES; i++) {
+                        correlation += Math.abs(buf[i] - buf[i + offset]);
+                    }
+                    
+                    correlation = 1 - (correlation / MAX_SAMPLES);
+                    correlations[offset] = correlation;
+                    
+                    if ((correlation > 0.9) && (correlation > lastCorrelation)) {
+                        bestOffset = offset;
+                        bestCorrelation = correlation;
+                    } else if (bestCorrelation > 0.9) {
+                        break;
+                    }
+                    
+                    lastCorrelation = correlation;
+                }
+                
+                if (bestCorrelation > 0.9) {
+                    let foundTone = sampleRate / bestOffset;
+                    
+                    while (foundTone > 500) {
+                        foundTone /= 2;
+                    }
+                    
+                    while (foundTone < 60) {
+                        foundTone *= 2;
+                    }
+                    
+                    return foundTone;
+                }
+                
+                return -1;
+            }
+            
+            function updatePitch() {
+                analyser.getFloatTimeDomainData(window.pitchBuffer);
+                const freq = autoCorrelate(window.pitchBuffer, audioContext.sampleRate);
+                
+                if (freq > 0) {
+                    const details = getNoteDetails(freq);
+                    const displayNote = details.note + details.octave;
+                    
+                    noteDisplay.textContent = displayNote;
+                    frequencyDisplay.textContent = `${freq.toFixed(2)} Hz (${details.cents > 0 ? '+' : ''}${details.cents} cents)`;
+                    
+                    let centsOffTarget = 0;
+                    const targetFreq = guitarStrings[currentString];
+                    if (targetFreq) {
+                        const targetDetails = getNoteDetails(targetFreq);
+                        const targetNote = targetDetails.note + targetDetails.octave;
+                        
+                        if (displayNote === targetNote) {
+                            centsOffTarget = details.cents;
+                        } else {
+                            const halfStepsAway = Math.abs(getNoteFromPitch(freq) - getNoteFromPitch(targetFreq));
+                            const centsPerHalfStep = 100;
+                            centsOffTarget = halfStepsAway * centsPerHalfStep * (freq < targetFreq ? -1 : 1);
+                            centsOffTarget = Math.max(-50, Math.min(50, centsOffTarget));
+                        }
+                        
+                        updateIndicator(centsOffTarget);
+                    } else {
+                        updateIndicator(details.cents);
+                    }
+                }
+                
+                if (isListening) {
+                    animationFrame = requestAnimationFrame(updatePitch);
+                }
+            }
+            
+            async function startListening() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        audio: { 
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false
+                        } 
+                    });
+                    
+                    permissionAlert.style.display = 'none';
+                    
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    analyser = audioContext.createAnalyser();
+                    microphone = audioContext.createMediaStreamSource(stream);
+                    
+                    analyser.fftSize = 2048;
+                    window.pitchBuffer = new Float32Array(analyser.fftSize);
+                    
+                    microphone.connect(analyser);
+                    
+                    isListening = true;
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    
+                    updatePitch();
+                } catch (error) {
+                    console.error('Error accessing microphone:', error);
+                    permissionAlert.style.display = 'block';
+                }
+            }
+            
+            function stopListening() {
+                if (audioContext) {
+                    cancelAnimationFrame(animationFrame);
+                    if (microphone) microphone.disconnect();
+                    if (analyser) analyser.disconnect();
+                    audioContext.close();
+                }
+                
+                isListening = false;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                noteDisplay.textContent = '—';
+                frequencyDisplay.textContent = '0 Hz';
+                noteDisplay.style.color = 'var(--text-primary)';
+                indicatorNeedle.style.left = '50%';
+            }
+            
+            startBtn.addEventListener('click', startListening);
+            stopBtn.addEventListener('click', stopListening);
+            
+            stringBtns.forEach(button => {
+                button.addEventListener('click', function() {
+                    stringBtns.forEach(btn => btn.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    targetFrequency = parseFloat(this.dataset.freq);
+                    currentString = this.textContent;
+                });
+            });
+        });
+    </script>
+</body>
+</html>
